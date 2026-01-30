@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import threading
 from datetime import datetime
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
@@ -8,25 +9,46 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from fastapi import FastAPI
+import uvicorn
 
-# Читаем токен из переменных окружения Render (НЕ трогай эту строку!)
+# Токены из переменных окружения
 API_TOKEN = os.getenv('BOT_TOKEN')
-# Читаем ID админа (твой ID в Telegram)
 ADMIN_ID = os.getenv('ADMIN_ID')
 
-# Проверка что токен есть
 if not API_TOKEN:
-    raise ValueError("BOT_TOKEN не найден! Добавь его в Environment Variables на Render")
-
+    raise ValueError("BOT_TOKEN не найден!")
 if not ADMIN_ID:
-    raise ValueError("ADMIN_ID не найден! Добавь его в Environment Variables на Render")
+    raise ValueError("ADMIN_ID не найден!")
 
-ADMIN_ID = int(ADMIN_ID)  # Превращаем в число
+ADMIN_ID = int(ADMIN_ID)
 
+# Настройка логов
 logging.basicConfig(level=logging.INFO)
+
+# Flask/FastAPI для Render (чтобы он не убивал бота)
+app = FastAPI()
+
+@app.get("/")
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "alive",
+        "bot": "@photo_print_orders_bot",
+        "time": datetime.now().strftime("%H:%M:%S")
+    }
+
+def run_web():
+    """Запускаем веб-сервер в отдельном потоке"""
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+
+# Создаем бота
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
+
+# ... (весь остальной код бота остается без изменений: OrderState, main_kb, start, order_start и т.д.) ...
 
 class OrderState(StatesGroup):
     uploading = State()
@@ -45,8 +67,7 @@ def main_kb():
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
-        "👋 Привет! Я бот для заказа печати фото.\n\n"
-        "Нажмите «Оформить заказ», чтобы начать.",
+        "👋 Привет! Я бот для заказа печати фото.\n\nНажмите «Оформить заказ», чтобы начать.",
         reply_markup=main_kb()
     )
 
@@ -54,8 +75,7 @@ async def start(message: types.Message):
 async def order_start(message: types.Message, state: FSMContext):
     await state.set_state(OrderState.uploading)
     await message.answer(
-        "📤 Отправьте фотографии (можно несколько сразу).\n"
-        "Когда закончите — напишите «Готово»",
+        "📤 Отправьте фотографии (можно несколько сразу).\nКогда закончите — напишите «Готово»",
         reply_markup=ReplyKeyboardMarkup(
             keyboard=[[KeyboardButton(text="✅ Готово")]],
             resize_keyboard=True
@@ -104,7 +124,7 @@ async def set_delivery(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(delivery=d_type, extra=200 if d_type=="delivery" else 0)
     await state.set_state(OrderState.phone)
     await callback.message.edit_text(
-        "📱 Отправьте свой номер телефона для связи:",
+        "📱 Отправьте свой номер телефона:",
         reply_markup=ReplyKeyboardMarkup(
             keyboard=[[KeyboardButton(text="📱 Отправить контакт", request_contact=True)]],
             resize_keyboard=True
@@ -145,14 +165,12 @@ async def confirm(callback: types.CallbackQuery, state: FSMContext):
                   f"💰 Сумма: {data['total']}₽")
     
     await bot.send_message(ADMIN_ID, admin_text)
-    # Отправляем фото админу первые 3 шт
     for i, photo in enumerate(data['photos'][:3]):
         await bot.send_photo(ADMIN_ID, photo, caption=f"Фото {i+1}")
     
     await callback.message.edit_text(
         f"✅ Заказ принят! Номер: #{datetime.now().strftime('%H%M%S')}\n"
-        f"Мы свяжемся с вами для подтверждения.\n"
-        f"Оплата при получении.",
+        f"Мы свяжемся для подтверждения. Оплата при получении.",
         reply_markup=main_kb()
     )
     await state.clear()
@@ -161,7 +179,15 @@ async def confirm(callback: types.CallbackQuery, state: FSMContext):
 async def history(message: types.Message):
     await message.answer("📭 История заказов будет доступна после первого заказа.", reply_markup=main_kb())
 
+# Главная функция
 async def main():
+    # Запускаем веб-сервер в фоне (для Render)
+    thread = threading.Thread(target=run_web, daemon=True)
+    thread.start()
+    logging.info("Web server started on port 8000")
+    
+    # Запускаем бота
+    logging.info("Starting bot...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
