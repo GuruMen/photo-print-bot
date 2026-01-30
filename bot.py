@@ -12,7 +12,7 @@ from aiogram.enums import ParseMode
 
 # Получаем токен из переменных окружения
 API_TOKEN = os.getenv('BOT_TOKEN')
-if not API_TOKEN:
+if not API_TOKEN:8547356841:AAEdicLmhm8HXqthBu1o1aS9XptX30DjtUI
     raise ValueError("Не найден BOT_TOKEN!")
 
 # ID администратора (замените на свой, узнать можно у @userinfobot)
