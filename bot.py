@@ -16,7 +16,7 @@ if not API_TOKEN:8547356841:AAEdicLmhm8HXqthBu1o1aS9XptX30DjtUI
     raise ValueError("Не найден BOT_TOKEN!")
 
 # ID администратора (замените на свой, узнать можно у @userinfobot)
-ADMIN_ID = 8547356841  # <-- ЗАМЕНИТЕ НА СВОЙ ID!
+ADMIN_ID =8547356841  # <-- ЗАМЕНИТЕ НА СВОЙ ID!
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
