@@ -8,15 +8,20 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.enums import ParseMode
 
-# Получаем токен из переменных окружения
+# Читаем токен из переменных окружения Render (НЕ трогай эту строку!)
 API_TOKEN = os.getenv('BOT_TOKEN')
-if not API_TOKEN:8547356841:AAEdicLmhm8HXqthBu1o1aS9XptX30DjtUI
-    raise ValueError("Не найден BOT_TOKEN!")
+# Читаем ID админа (твой ID в Telegram)
+ADMIN_ID = os.getenv('ADMIN_ID')
 
-# ID администратора (замените на свой, узнать можно у @userinfobot)
-ADMIN_ID =8547356841  # <-- ЗАМЕНИТЕ НА СВОЙ ID!
+# Проверка что токен есть
+if not API_TOKEN:
+    raise ValueError("BOT_TOKEN не найден! Добавь его в Environment Variables на Render")
+
+if not ADMIN_ID:
+    raise ValueError("ADMIN_ID не найден! Добавь его в Environment Variables на Render")
+
+ADMIN_ID = int(ADMIN_ID)  # Превращаем в число
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
@@ -154,7 +159,7 @@ async def confirm(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.message(F.text == "📋 Мои заказы")
 async def history(message: types.Message):
-    await message.answer("📭 История заказов появится здесь после первого заказа.\n(В бесплатной версии хранится временно)", reply_markup=main_kb())
+    await message.answer("📭 История заказов будет доступна после первого заказа.", reply_markup=main_kb())
 
 async def main():
     await dp.start_polling(bot)
